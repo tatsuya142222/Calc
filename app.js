@@ -75,6 +75,34 @@ function switchTab(tab) {
 
 tabButtons.forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
+// ---------- スワイプ操作 ----------
+function addSwipeNav(el, { onSwipeLeft, onSwipeRight }) {
+  if (!el) return;
+  const THRESHOLD = 40;
+  let startX = null;
+  let startY = null;
+  let tracking = false;
+
+  el.addEventListener("pointerdown", (e) => {
+    startX = e.clientX;
+    startY = e.clientY;
+    tracking = true;
+  });
+  el.addEventListener("pointerup", (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (Math.abs(dx) > THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) onSwipeLeft?.();
+      else onSwipeRight?.();
+    }
+  });
+  el.addEventListener("pointercancel", () => {
+    tracking = false;
+  });
+}
+
 // ---------- 設定画面の描画 ----------
 const jobsContainer = document.getElementById("jobs-container");
 
@@ -307,6 +335,7 @@ function markSignedIn() {
   document.getElementById("signin-btn").style.display = "none";
   document.getElementById("signout-btn").style.display = "inline-block";
   setAuthStatus(true);
+  refreshSalaryView();
 }
 
 function initGis() {
@@ -357,6 +386,8 @@ document.getElementById("signout-btn").addEventListener("click", () => {
   document.getElementById("signin-btn").style.display = "inline-block";
   document.getElementById("signout-btn").style.display = "none";
   setAuthStatus(false);
+  refreshSalaryView();
+  reportLoadedOnce = false;
 });
 
 function setAuthStatus(connected) {
@@ -615,16 +646,23 @@ function setStatus(msg, isError) {
   el.className = isError ? "error" : "";
 }
 
-document.getElementById("month-input").value = new Date().toISOString().slice(0, 7);
+function todayMonthStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
 
-document.getElementById("calc-btn").addEventListener("click", async () => {
+let salaryMonth = todayMonthStr();
+
+function updateSalaryMonthLabel() {
+  document.getElementById("salary-month-label").textContent = monthStrToLabel(salaryMonth, false);
+}
+
+async function refreshSalaryView() {
+  updateSalaryMonthLabel();
+
   if (!accessToken) {
     setStatus("先にGoogleでログインしてください。", true);
-    return;
-  }
-  const monthValue = document.getElementById("month-input").value;
-  if (!monthValue) {
-    setStatus("対象月を選択してください。", true);
+    document.getElementById("result-section").style.display = "none";
     return;
   }
   setStatus("計算中...");
@@ -632,15 +670,16 @@ document.getElementById("calc-btn").addEventListener("click", async () => {
   try {
     // 締め日・支払サイクルにより、対象月の振込に含まれる勤務は前後の月にまたがりうるため
     // 前後3ヶ月分の予定を取得してから振込月でフィルタする
-    const rangeStartStr = shiftMonthStr(monthValue, -3);
-    const rangeEndStr = shiftMonthStr(monthValue, 3);
+    const targetMonth = salaryMonth;
+    const rangeStartStr = shiftMonthStr(targetMonth, -3);
+    const rangeEndStr = shiftMonthStr(targetMonth, 3);
     const rs = monthStrToParts(rangeStartStr);
     const re = monthStrToParts(rangeEndStr);
     const rangeStart = new Date(rs.year, rs.month0, 1);
     const rangeEnd = new Date(re.year, re.month0, 1);
 
     const shifts = await getEnrichedShifts(rangeStart, rangeEnd);
-    const filtered = shifts.filter((s) => s.paymentMonth === monthValue);
+    const filtered = shifts.filter((s) => s.paymentMonth === targetMonth);
 
     const jobTotals = new Map(); // jobId -> {hours, pay, keyword}
     for (const s of filtered) {
@@ -661,13 +700,35 @@ document.getElementById("calc-btn").addEventListener("click", async () => {
       }))
       .sort((a, b) => a.date - b.date);
 
+    // 表示中に月が切り替わっていたら、古い結果を反映しない
+    if (targetMonth !== salaryMonth) return;
+
     renderResults(shiftRows, jobTotals);
     setStatus(`${shiftRows.length}件の勤務予定を集計しました。`);
   } catch (err) {
     console.error(err);
     setStatus(err.message || "エラーが発生しました。", true);
   }
+}
+
+function salaryGoPrev() {
+  salaryMonth = shiftMonthStr(salaryMonth, -1);
+  refreshSalaryView();
+}
+function salaryGoNext() {
+  salaryMonth = shiftMonthStr(salaryMonth, 1);
+  refreshSalaryView();
+}
+
+document.getElementById("salary-prev-btn").addEventListener("click", salaryGoPrev);
+document.getElementById("salary-next-btn").addEventListener("click", salaryGoNext);
+
+addSwipeNav(document.querySelector('.tab-panel[data-tab="salary"]'), {
+  onSwipeLeft: salaryGoNext,
+  onSwipeRight: salaryGoPrev,
 });
+
+refreshSalaryView();
 
 function renderResults(shiftRows, jobTotals) {
   const resultSection = document.getElementById("result-section");
@@ -720,9 +781,44 @@ function renderResults(shiftRows, jobTotals) {
 const REPORT_MONTHS = 6;
 const PALETTE = ["#4f46e5", "#0ea5e9", "#f59e0b", "#10b981", "#ef4444", "#a855f7"];
 
+let reportEndMonth = todayMonthStr(); // 表示中の6ヶ月の一番右(最新)の月
+
+function getReportMonths(endMonth) {
+  const months = [];
+  for (let i = REPORT_MONTHS - 1; i >= 0; i--) months.push(shiftMonthStr(endMonth, -i));
+  return months;
+}
+
+function updateReportRangeLabel() {
+  const months = getReportMonths(reportEndMonth);
+  document.getElementById("report-range-label").textContent =
+    `${monthStrToLabel(months[0], false)} 〜 ${monthStrToLabel(months[months.length - 1], false)}`;
+  document.getElementById("report-next-btn").disabled = reportEndMonth === todayMonthStr();
+}
+
+function reportGoPrev() {
+  reportEndMonth = shiftMonthStr(reportEndMonth, -REPORT_MONTHS);
+  loadReport();
+}
+function reportGoNext() {
+  if (reportEndMonth === todayMonthStr()) return;
+  reportEndMonth = shiftMonthStr(reportEndMonth, REPORT_MONTHS);
+  loadReport();
+}
+
+document.getElementById("report-prev-btn").addEventListener("click", reportGoPrev);
+document.getElementById("report-next-btn").addEventListener("click", reportGoNext);
 document.getElementById("report-refresh-btn").addEventListener("click", loadReport);
 
+addSwipeNav(document.querySelector('.tab-panel[data-tab="report"]'), {
+  onSwipeLeft: reportGoNext,
+  onSwipeRight: reportGoPrev,
+});
+
+updateReportRangeLabel();
+
 async function loadReport() {
+  updateReportRangeLabel();
   const statusEl = document.getElementById("report-status");
   if (!accessToken) {
     statusEl.textContent = "先にGoogleでログインしてください。";
@@ -733,10 +829,8 @@ async function loadReport() {
   statusEl.className = "muted";
 
   try {
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const months = [];
-    for (let i = REPORT_MONTHS - 1; i >= 0; i--) months.push(shiftMonthStr(currentMonthStr, -i));
+    const targetEndMonth = reportEndMonth;
+    const months = getReportMonths(targetEndMonth);
 
     const rangeStartStr = shiftMonthStr(months[0], -3);
     const rangeEndStr = shiftMonthStr(months[months.length - 1], 3);
@@ -757,6 +851,9 @@ async function loadReport() {
       t.hours += s.hours;
       monthMap.set(s.job.id, t);
     }
+
+    // 表示中に期間が切り替わっていたら、古い結果を反映しない
+    if (targetEndMonth !== reportEndMonth) return;
 
     renderReport(months, totals);
     statusEl.textContent = "";

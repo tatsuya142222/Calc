@@ -18,13 +18,11 @@
     <section class="tab-panel active" data-tab="salary">
       <div class="card" id="calc-section">
         <h2>給与計算</h2>
-        <p class="section-desc">選んだ月に「振り込まれる」給与の合計を、各バイトの締め日・支払サイクルに基づいて計算します。</p>
-        <div class="row">
-          <div class="field">
-            <label class="field-label" for="month-input">対象月(振込月)</label>
-            <input type="month" id="month-input">
-          </div>
-          <button id="calc-btn">計算する</button>
+        <p class="section-desc">矢印またはスワイプで月を切り替えると、その月に「振り込まれる」給与の合計を自動で計算します。</p>
+        <div class="month-nav">
+          <button class="nav-btn" id="salary-prev-btn" aria-label="前の月">‹</button>
+          <div class="month-nav-label" id="salary-month-label"></div>
+          <button class="nav-btn" id="salary-next-btn" aria-label="次の月">›</button>
         </div>
         <p id="status-message"></p>
       </div>
@@ -73,9 +71,14 @@
         <div class="row" style="justify-content: space-between; align-items:flex-start;">
           <div>
             <h2>過去のレポート</h2>
-            <p class="section-desc">直近6ヶ月に振り込まれる(振り込まれた)給与を月ごとにまとめます。</p>
+            <p class="section-desc">矢印またはスワイプで6ヶ月ごとに表示期間を切り替えられます。</p>
           </div>
           <button id="report-refresh-btn" class="secondary">更新</button>
+        </div>
+        <div class="month-nav">
+          <button class="nav-btn" id="report-prev-btn" aria-label="前の6ヶ月">‹</button>
+          <div class="month-nav-label" id="report-range-label"></div>
+          <button class="nav-btn" id="report-next-btn" aria-label="次の6ヶ月">›</button>
         </div>
         <p id="report-status" class="muted"></p>
         <div id="report-chart-wrap"></div>

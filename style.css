@@ -62,7 +62,7 @@ main {
   gap: 16px;
 }
 
-.tab-panel { display: none; flex-direction: column; gap: 16px; }
+.tab-panel { display: none; flex-direction: column; gap: 16px; touch-action: pan-y; }
 .tab-panel.active { display: flex; }
 
 /* ---------- bottom tab bar ---------- */
@@ -369,8 +369,44 @@ input::-webkit-calendar-picker-indicator { opacity: 0.6; }
 
 #save-status.saved { background: var(--success-soft); color: var(--success); }
 
+/* ---------- month navigator ---------- */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 4px;
+  touch-action: pan-y;
+}
+
+.nav-btn {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-size: 1.2rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: none;
+}
+.nav-btn:hover { border-color: var(--accent); color: var(--accent); box-shadow: none; transform: none; }
+.nav-btn:disabled { opacity: 0.3; pointer-events: none; }
+
+.month-nav-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
 /* ---------- calc / results ---------- */
-#month-input { min-width: 150px; }
 
 #status-message {
   font-size: 0.85rem;
