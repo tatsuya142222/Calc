@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>バイト給与計算</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1>バイト給与計算</h1>
+    <p class="muted">Googleカレンダーの予定から自動で給与を集計します</p>
+  </header>
+
+  <div id="tab-panels">
+    <section class="tab-panel active" data-tab="salary">
+      <div class="card" id="calc-section">
+        <h2>給与計算</h2>
+        <p class="section-desc">選んだ月に「振り込まれる」給与の合計を、各バイトの締め日・支払サイクルに基づいて計算します。</p>
+        <div class="row">
+          <div class="field">
+            <label class="field-label" for="month-input">対象月(振込月)</label>
+            <input type="month" id="month-input">
+          </div>
+          <button id="calc-btn">計算する</button>
+        </div>
+        <p id="status-message"></p>
+      </div>
+
+      <div class="card" id="result-section" style="display:none;">
+        <h2>集計結果</h2>
+        <div id="summary-grid" class="summary-grid"></div>
+        <div class="shift-list">
+          <div class="shift-row head">
+            <span>日付</span><span>バイト</span><span>時間</span><span>内訳</span><span>支給額</span>
+          </div>
+          <div id="shifts-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-tab="settings">
+      <div class="card" id="auth-section">
+        <h2>Googleカレンダー連携</h2>
+        <div class="auth-row">
+          <button id="signin-btn">Googleでログイン</button>
+          <button id="signout-btn" class="secondary" style="display:none;">ログアウト</button>
+          <span id="auth-status" class="status-pill"><span class="dot"></span>未接続</span>
+        </div>
+      </div>
+
+      <div class="card" id="settings-section">
+        <h2>バイト先の設定</h2>
+        <p class="section-desc">
+          予定タイトルの先頭が「キーワード」と一致する予定を、そのバイトの勤務として集計します。
+          「締め日」「支払サイクル」は、勤務した日がどの月の振込に含まれるかの判定に使われます。
+        </p>
+        <div id="jobs-container"></div>
+        <div class="add-job-row">
+          <button id="add-job-btn" class="secondary">+ バイトを追加</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" data-tab="report">
+      <div class="card" id="report-section">
+        <div class="row" style="justify-content: space-between; align-items:flex-start;">
+          <div>
+            <h2>過去のレポート</h2>
+            <p class="section-desc">直近6ヶ月に振り込まれる(振り込まれた)給与を月ごとにまとめます。</p>
+          </div>
+          <button id="report-refresh-btn" class="secondary">更新</button>
+        </div>
+        <p id="report-status" class="muted"></p>
+        <div id="report-chart-wrap"></div>
+        <div id="report-legend" class="report-legend"></div>
+        <div id="report-table" class="report-table"></div>
+      </div>
+    </section>
+  </div>
+
+  <nav class="tab-bar">
+    <button class="tab-btn active" data-tab="salary">
+      <span class="tab-icon tab-icon-yen">¥</span>
+      <span>給与</span>
+    </button>
+    <button class="tab-btn" data-tab="settings">
+      <span class="tab-icon tab-icon-gear">⚙</span>
+      <span>設定</span>
+    </button>
+    <button class="tab-btn" data-tab="report">
+      <span class="tab-icon tab-icon-chart"><i></i><i></i><i></i></span>
+      <span>レポート</span>
+    </button>
+  </nav>
+</main>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
