@@ -260,6 +260,37 @@ renderJobs();
 let accessToken = null;
 let tokenClient = null;
 
+const TOKEN_STORAGE_KEY = "baito_google_token_v1";
+const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000; // 期限ぎりぎりでの失敗を避けるための余裕
+
+function saveToken(token, expiresInSec) {
+  const expiresAt = Date.now() + expiresInSec * 1000;
+  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify({ token, expiresAt }));
+}
+
+function loadStoredToken() {
+  const raw = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const { token, expiresAt } = JSON.parse(raw);
+    if (token && expiresAt - Date.now() > TOKEN_EXPIRY_BUFFER_MS) return token;
+  } catch {
+    // ignore
+  }
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  return null;
+}
+
+function clearStoredToken() {
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+function markSignedIn() {
+  document.getElementById("signin-btn").style.display = "none";
+  document.getElementById("signout-btn").style.display = "inline-block";
+  setAuthStatus(true);
+}
+
 function initGis() {
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
@@ -270,11 +301,17 @@ function initGis() {
         return;
       }
       accessToken = resp.access_token;
-      document.getElementById("signin-btn").style.display = "none";
-      document.getElementById("signout-btn").style.display = "inline-block";
-      setAuthStatus(true);
+      saveToken(resp.access_token, resp.expires_in);
+      markSignedIn();
     },
   });
+
+  // 前回のログインがまだ有効なら、ボタンを押さずに自動で復元する
+  const stored = loadStoredToken();
+  if (stored) {
+    accessToken = stored;
+    markSignedIn();
+  }
 }
 
 window.addEventListener("load", () => {
@@ -298,6 +335,7 @@ document.getElementById("signout-btn").addEventListener("click", () => {
     google.accounts.oauth2.revoke(accessToken, () => {});
   }
   accessToken = null;
+  clearStoredToken();
   document.getElementById("signin-btn").style.display = "inline-block";
   document.getElementById("signout-btn").style.display = "none";
   setAuthStatus(false);
@@ -491,6 +529,14 @@ async function fetchCalendarEvents(timeMin, timeMax) {
   url.searchParams.set("maxResults", "2500");
 
   const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (res.status === 401) {
+    accessToken = null;
+    clearStoredToken();
+    document.getElementById("signin-btn").style.display = "inline-block";
+    document.getElementById("signout-btn").style.display = "none";
+    setAuthStatus(false);
+    throw new Error("ログインの有効期限が切れました。もう一度ログインしてください。");
+  }
   if (!res.ok) throw new Error(`カレンダー取得に失敗しました (${res.status})`);
   const data = await res.json();
   return data.items || [];
