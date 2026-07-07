@@ -52,6 +52,7 @@ body {
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
   padding: 24px 16px calc(88px + env(safe-area-inset-bottom));
+  overflow-x: hidden;
 }
 
 main {
@@ -62,7 +63,7 @@ main {
   gap: 16px;
 }
 
-.tab-panel { display: none; flex-direction: column; gap: 16px; touch-action: pan-y; }
+.tab-panel { display: none; flex-direction: column; gap: 16px; touch-action: pan-y; will-change: transform; }
 .tab-panel.active { display: flex; }
 
 /* ---------- bottom tab bar ---------- */

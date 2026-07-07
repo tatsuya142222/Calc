@@ -75,31 +75,86 @@ function switchTab(tab) {
 
 tabButtons.forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
 
-// ---------- スワイプ操作 ----------
+// ---------- スワイプ操作(指に追従してスライドするアニメーション付き) ----------
 function addSwipeNav(el, { onSwipeLeft, onSwipeRight }) {
   if (!el) return;
   const THRESHOLD = 40;
   let startX = null;
   let startY = null;
   let tracking = false;
+  let dragging = false;
+  let animating = false;
+
+  function snapBack() {
+    el.style.transition = "transform 0.2s ease";
+    el.style.transform = "translateX(0)";
+  }
+
+  function completeSwipe(direction, callback) {
+    animating = true;
+    const width = el.getBoundingClientRect().width || 320;
+    const outX = direction === "left" ? -width : width;
+    el.style.transition = "transform 0.18s ease-in, opacity 0.18s ease-in";
+    el.style.transform = `translateX(${outX}px)`;
+    el.style.opacity = "0.3";
+    setTimeout(() => {
+      callback?.();
+      // 反対側にワープしてから、新しい内容を滑り込ませる
+      el.style.transition = "none";
+      el.style.transform = `translateX(${-outX}px)`;
+      void el.offsetWidth; // 強制リフロー
+      requestAnimationFrame(() => {
+        el.style.transition = "transform 0.22s ease-out, opacity 0.22s ease-out";
+        el.style.transform = "translateX(0)";
+        el.style.opacity = "1";
+        setTimeout(() => {
+          el.style.transition = "";
+          animating = false;
+        }, 240);
+      });
+    }, 180);
+  }
 
   el.addEventListener("pointerdown", (e) => {
+    if (animating) return;
     startX = e.clientX;
     startY = e.clientY;
     tracking = true;
+    dragging = false;
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!tracking || animating) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!dragging) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+        tracking = false; // 縦スクロールの意図はブラウザに任せる
+        return;
+      }
+      if (Math.abs(dx) > 8) dragging = true;
+    }
+    if (dragging) {
+      el.style.transition = "none";
+      el.style.transform = `translateX(${dx}px)`;
+    }
   });
   el.addEventListener("pointerup", (e) => {
     if (!tracking) return;
     tracking = false;
     const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    if (Math.abs(dx) > THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (dx < 0) onSwipeLeft?.();
-      else onSwipeRight?.();
+    if (dragging) {
+      if (Math.abs(dx) > THRESHOLD) {
+        completeSwipe(dx < 0 ? "left" : "right", dx < 0 ? onSwipeLeft : onSwipeRight);
+      } else {
+        snapBack();
+      }
     }
+    dragging = false;
   });
   el.addEventListener("pointercancel", () => {
+    if (tracking && dragging) snapBack();
     tracking = false;
+    dragging = false;
   });
 }
 
