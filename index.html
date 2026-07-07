@@ -8,17 +8,15 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
+<div class="bg-glow"></div>
 <main>
   <header>
     <h1>バイト給与計算</h1>
-    <p class="muted">Googleカレンダーの予定から自動で給与を集計します</p>
   </header>
 
   <div id="tab-panels">
     <section class="tab-panel active" data-tab="salary">
-      <div class="card" id="calc-section">
-        <h2>給与計算</h2>
-        <p class="section-desc">矢印またはスワイプで月を切り替えると、その月に「振り込まれる」給与の合計を自動で計算します。</p>
+      <div class="card nav-card" id="calc-section">
         <div class="month-nav">
           <button class="nav-btn" id="salary-prev-btn" aria-label="前の月">‹</button>
           <div class="month-nav-label" id="salary-month-label"></div>
@@ -27,13 +25,14 @@
         <p id="status-message"></p>
       </div>
 
-      <div class="card" id="result-section" style="display:none;">
-        <h2>集計結果</h2>
+      <div class="card hero-card" id="result-section" style="display:none;">
+        <div class="hero-total">
+          <div class="hero-label">合計支給額</div>
+          <div class="hero-amount" id="hero-amount">¥0</div>
+          <div class="hero-sub" id="hero-sub"></div>
+        </div>
         <div id="summary-grid" class="summary-grid"></div>
-        <div class="shift-list">
-          <div class="shift-row head">
-            <span>日付</span><span>バイト</span><span>時間</span><span>内訳</span><span>支給額</span>
-          </div>
+        <div class="shift-list" id="shift-list">
           <div id="shifts-body"></div>
         </div>
       </div>
@@ -51,10 +50,6 @@
 
       <div class="card" id="settings-section">
         <h2>バイト先の設定</h2>
-        <p class="section-desc">
-          予定タイトルの先頭が「キーワード」と一致する予定を、そのバイトの勤務として集計します。
-          「締め日」「支払サイクル」は、勤務した日がどの月の振込に含まれるかの判定に使われます。
-        </p>
         <div id="jobs-container"></div>
         <div class="add-job-row">
           <button id="add-job-btn" class="secondary">+ バイトを追加</button>
@@ -68,12 +63,9 @@
 
     <section class="tab-panel" data-tab="report">
       <div class="card" id="report-section">
-        <div class="row" style="justify-content: space-between; align-items:flex-start;">
-          <div>
-            <h2>過去のレポート</h2>
-            <p class="section-desc">矢印またはスワイプで6ヶ月ごとに表示期間を切り替えられます。</p>
-          </div>
-          <button id="report-refresh-btn" class="secondary">更新</button>
+        <div class="row report-header-row">
+          <h2>過去のレポート</h2>
+          <button id="report-refresh-btn" class="icon-btn" title="更新" aria-label="更新">⟳</button>
         </div>
         <div class="month-nav">
           <button class="nav-btn" id="report-prev-btn" aria-label="前の6ヶ月">‹</button>

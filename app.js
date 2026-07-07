@@ -720,7 +720,7 @@ async function refreshSalaryView() {
     document.getElementById("result-section").style.display = "none";
     return;
   }
-  setStatus("計算中...");
+  setStatus("計算中");
 
   try {
     // 締め日・支払サイクルにより、対象月の振込に含まれる勤務は前後の月にまたがりうるため
@@ -736,9 +736,9 @@ async function refreshSalaryView() {
     const shifts = await getEnrichedShifts(rangeStart, rangeEnd);
     const filtered = shifts.filter((s) => s.paymentMonth === targetMonth);
 
-    const jobTotals = new Map(); // jobId -> {hours, pay, keyword}
+    const jobTotals = new Map(); // jobId -> {hours, pay, keyword, id}
     for (const s of filtered) {
-      const t = jobTotals.get(s.job.id) || { hours: 0, pay: 0, keyword: s.job.keyword };
+      const t = jobTotals.get(s.job.id) || { hours: 0, pay: 0, keyword: s.job.keyword, id: s.job.id };
       t.hours += s.hours;
       t.pay += s.pay;
       jobTotals.set(s.job.id, t);
@@ -747,6 +747,7 @@ async function refreshSalaryView() {
     const shiftRows = filtered
       .map((s) => ({
         date: s.date,
+        jobId: s.job.id,
         jobKeyword: s.job.keyword,
         timeRange: s.timeRange,
         hours: s.hours,
@@ -759,7 +760,7 @@ async function refreshSalaryView() {
     if (targetMonth !== salaryMonth) return;
 
     renderResults(shiftRows, jobTotals);
-    setStatus(`${shiftRows.length}件の勤務予定を集計しました。`);
+    setStatus("");
   } catch (err) {
     console.error(err);
     setStatus(err.message || "エラーが発生しました。", true);
@@ -789,52 +790,60 @@ function renderResults(shiftRows, jobTotals) {
   const resultSection = document.getElementById("result-section");
   resultSection.style.display = "block";
 
+  let grandTotal = 0;
+  let grandHours = 0;
   const summaryGrid = document.getElementById("summary-grid");
   summaryGrid.innerHTML = "";
-
-  let grandTotal = 0;
   for (const [, t] of jobTotals) {
     grandTotal += t.pay;
+    grandHours += t.hours;
     const tile = document.createElement("div");
     tile.className = "summary-tile";
+    tile.style.setProperty("--tile-color", getJobColor(t.id));
     tile.innerHTML = `
       <div class="tile-label">${escapeHtml(t.keyword)}</div>
-      <div class="amount">${Math.round(t.pay).toLocaleString()}円</div>
-      <div class="tile-sub">${t.hours.toFixed(2)}h</div>
+      <div class="amount">¥${Math.round(t.pay).toLocaleString()}</div>
+      <div class="tile-sub">${t.hours.toFixed(1)}h</div>
     `;
     summaryGrid.appendChild(tile);
   }
-  const totalTile = document.createElement("div");
-  totalTile.className = "summary-tile total";
-  totalTile.innerHTML = `
-    <div class="tile-label">合計</div>
-    <div class="amount">${Math.round(grandTotal).toLocaleString()}円</div>
-  `;
-  summaryGrid.appendChild(totalTile);
+
+  document.getElementById("hero-amount").textContent = `¥${Math.round(grandTotal).toLocaleString()}`;
+  document.getElementById("hero-sub").textContent = jobTotals.size
+    ? `${grandHours.toFixed(1)}時間・${jobTotals.size}件のバイト`
+    : "";
 
   const body = document.getElementById("shifts-body");
   body.innerHTML = "";
   if (shiftRows.length === 0) {
-    body.innerHTML = `<div class="empty-state">この振込月に一致する勤務予定は見つかりませんでした。</div>`;
+    body.innerHTML = `<div class="empty-state">該当する勤務予定はありません</div>`;
     return;
   }
   for (const row of shiftRows) {
     const rowEl = document.createElement("div");
     rowEl.className = "shift-row";
+    rowEl.style.setProperty("--row-color", getJobColor(row.jobId));
     rowEl.innerHTML = `
       <span class="cell-date">${formatDateKey(row.date)}</span>
       <span class="cell-job">${escapeHtml(row.jobKeyword)}</span>
       <span class="cell-time">${row.timeRange}<br><span class="tile-sub">${row.hours.toFixed(2)}h</span></span>
       <span class="cell-breakdown">${escapeHtml(row.breakdownText)}</span>
-      <span class="cell-pay">${Math.round(row.pay).toLocaleString()}円</span>
+      <span class="cell-pay">¥${Math.round(row.pay).toLocaleString()}</span>
     `;
     body.appendChild(rowEl);
   }
 }
 
+// ---------- 色分け(タブ間で共通) ----------
+const PALETTE = ["#4f46e5", "#0ea5e9", "#f59e0b", "#10b981", "#ef4444", "#a855f7"];
+
+function getJobColor(jobId) {
+  const idx = jobs.findIndex((j) => j.id === jobId);
+  return PALETTE[(idx < 0 ? 0 : idx) % PALETTE.length];
+}
+
 // ---------- レポートタブ ----------
 const REPORT_MONTHS = 6;
-const PALETTE = ["#4f46e5", "#0ea5e9", "#f59e0b", "#10b981", "#ef4444", "#a855f7"];
 
 let reportEndMonth = todayMonthStr(); // 表示中の6ヶ月の一番右(最新)の月
 
@@ -920,8 +929,6 @@ async function loadReport() {
 }
 
 function renderReport(months, totals) {
-  const jobColor = new Map(jobs.map((j, i) => [j.id, PALETTE[i % PALETTE.length]]));
-
   let maxTotal = 0;
   const monthGrand = months.map((m) => {
     let sum = 0;
@@ -944,7 +951,7 @@ function renderReport(months, totals) {
 
     const amountEl = document.createElement("div");
     amountEl.className = "report-bar-amount";
-    amountEl.textContent = monthGrand[idx] > 0 ? Math.round(monthGrand[idx]).toLocaleString() : "";
+    amountEl.textContent = monthGrand[idx] > 0 ? `¥${Math.round(monthGrand[idx]).toLocaleString()}` : "";
     col.appendChild(amountEl);
 
     const stack = document.createElement("div");
@@ -957,9 +964,9 @@ function renderReport(months, totals) {
       if (!t || t.pay <= 0) continue;
       const seg = document.createElement("div");
       seg.className = "report-bar-seg";
-      seg.style.background = jobColor.get(job.id);
+      seg.style.background = getJobColor(job.id);
       seg.style.flexGrow = String(t.pay);
-      seg.title = `${job.keyword}: ${Math.round(t.pay).toLocaleString()}円`;
+      seg.title = `${job.keyword}: ¥${Math.round(t.pay).toLocaleString()}`;
       stack.appendChild(seg);
     }
     col.appendChild(stack);
@@ -978,7 +985,7 @@ function renderReport(months, totals) {
   jobs.forEach((job) => {
     const item = document.createElement("span");
     item.className = "legend-item";
-    item.innerHTML = `<span class="legend-dot" style="background:${jobColor.get(job.id)}"></span>${escapeHtml(job.keyword)}`;
+    item.innerHTML = `<span class="legend-dot" style="background:${getJobColor(job.id)}"></span>${escapeHtml(job.keyword)}`;
     legend.appendChild(item);
   });
 
@@ -993,14 +1000,14 @@ function renderReport(months, totals) {
       const t = monthMap.get(job.id);
       if (!t || t.pay <= 0) continue;
       total += t.pay;
-      parts.push(`${job.keyword} ${Math.round(t.pay).toLocaleString()}円`);
+      parts.push(`${job.keyword} ¥${Math.round(t.pay).toLocaleString()}`);
     }
     const row = document.createElement("div");
     row.className = "report-row";
     row.innerHTML = `
       <span class="report-row-month">${monthStrToLabel(m, false)}</span>
       <span class="report-row-parts">${parts.length ? escapeHtml(parts.join(" / ")) : "―"}</span>
-      <span class="report-row-total">${Math.round(total).toLocaleString()}円</span>
+      <span class="report-row-total">¥${Math.round(total).toLocaleString()}</span>
     `;
     table.appendChild(row);
   }
