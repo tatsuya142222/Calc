@@ -254,6 +254,24 @@ document.getElementById("add-job-btn").addEventListener("click", () => {
   persistAndRerender();
 });
 
+let saveStatusTimer = null;
+document.getElementById("save-settings-btn").addEventListener("click", () => {
+  // フォーカス中の入力欄があれば、その変更を確定させてから保存する
+  if (document.activeElement && document.activeElement !== document.body) {
+    document.activeElement.blur();
+  }
+  saveJobs(jobs);
+
+  const statusEl = document.getElementById("save-status");
+  statusEl.textContent = "保存しました";
+  statusEl.classList.add("saved");
+  clearTimeout(saveStatusTimer);
+  saveStatusTimer = setTimeout(() => {
+    statusEl.textContent = "";
+    statusEl.classList.remove("saved");
+  }, 2000);
+});
+
 renderJobs();
 
 // ---------- Google認証 ----------
